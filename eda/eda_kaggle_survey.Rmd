@@ -1,0 +1,150 @@
+---
+title: "A short Intro to R exploratory data analysis | exploring Kaggle State of Machine Learning Survey 2017 "
+output: html_notebook
+
+---
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(lubridate)
+library(readxl)
+
+library(scales)
+library(DBI)
+
+library(forcats)
+#library(reshape2)
+library(skimr)
+
+```
+
+Download data at 
+https://www.kaggle.com/kaggle/kaggle-survey-2017
+
+
+Load DATA
+```{r}
+mcr <- read.csv("/Users/merveakbas/Dropbox/_DataScience/_R/2017_NY_Rconf/multipleChoiceResponses.csv", stringsAsFactors = FALSE)
+```
+
+Check the column names
+```{r}
+names(mcr)
+```
+
+
+
+EXPLORE YOUR DATASET
+```{r}
+str(mcr)
+```
+Look at the first 5 rows
+```{r}
+head(mcr)
+```
+
+Check missing values
+```{r}
+mcr %>% summarize(nmissing = sum(is.na(Country)))
+```
+
+Check missing values for all variables
+```{r}
+mcr %>% purrr::map_df(~sum(is.na(.)))
+```
+
+Tabulate discipline1
+
+```{r}
+mcr %>% count(Country) %>% add_tally() %>% mutate(percent = (n/nn)*100)
+```
+Mising Value is not coded as NA
+Replace empty character cells with NA
+
+```{r}
+mcr <- mcr %>%  na_if("") 
+mcr %>% count(Country)
+```
+
+Check with another way
+```{r}
+mcr %>% summarize(nmissing = sum(is.na(Country)))
+```
+
+EXAMINE NUMERIC COLUMNS QUICKLY
+```{r}
+mcr %>% 
+  select_if(is.numeric) %>% 
+  skimr::skim()
+```
+
+EXAMINE A SINGLE COLUMN
+
+```{r}
+head(mcr$WorkMethodsSelect)
+```
+
+There are multiple answers in a character, separated by comma
+We need to separate them 
+
+```{r}
+mcr %>% 
+  count(WorkMethodsSelect, sort = TRUE)
+```
+
+```{r}
+#add an identifier
+library(dplyr)
+mcr <- mcr %>% mutate(id = row_number())
+```
+
+
+
+SPLIT THE STRINGS AT COMMAS because I want to look at all methods separately
+
+```{r}
+mcr %>% mutate(workmethod = str_split(WorkMethodsSelect, ",")) %>% dplyr::select(id, workmethod)
+```
+
+Every cell is now a list - this is not very useful. 
+
+But I want each cell of the list make one row and turn this data into a panel dataset
+Use Unnest from tidyr
+
+```{r}
+library(dplyr)
+mcr %>%  unnest( workmethods= str_split(WorkMethodsSelect, ",")) %>% dplyr::select(id, workmethods)
+```
+
+Or another way of doing it
+```{r}
+
+unnested_methods <- mcr %>% mutate(workmethods= str_split(WorkMethodsSelect, ",")) %>% dplyr::select(id, workmethods) %>% unnest()
+unnested_methods
+```
+
+```{r}
+unnested_methods %>% count(workmethods) %>% ggplot(aes(x = workmethods, y = n)) + geom_col()
+```
+
+UGLY - We better transpose it and make the bars sideways
+```{r}
+library(forcats)
+unnested_methods %>% count(workmethods) %>% ggplot(aes(x = workmethods, y = n)) + geom_col() + coord_flip()
+```
+
+Let's sort it 
+
+```{r}
+library(forcats)
+unnested_methods %>% count(workmethods) %>% ggplot(aes(x = fct_reorder(workmethods, n), y = n)) + geom_col() + coord_flip()
+
+```
+
+
+
+
+
